@@ -188,33 +188,97 @@ func (c *ListCommand) Result() ([]*ListEntry, error) {
 	return out, nil
 }
 
-//drop - Drop a set (Deletes from disk)
-//close - Closes a set (Unmaps from memory, but still accessible)
-//clear - Clears a set from the lists (Removes memory, left on disk)
+// SetCommand is used to act on a set
+type SetCommand struct {
+	// Command is invoked on the set
+	Command string
+
+	// SetName is the name of the set to create
+	SetName string
+
+	// result is the result of the decode
+	result string
+}
+
+// NewDropCommand is used to drop a set
+func NewDropCommand(name string) (*SetCommand, error) {
+	if !validWord.MatchString(name) {
+		return nil, fmt.Errorf("invalid set name")
+	}
+	cmd := &SetCommand{
+		Command: "drop",
+		SetName: name,
+	}
+	return cmd, nil
+}
+
+// NewCloseCommand is used to drop a set
+func NewCloseCommand(name string) (*SetCommand, error) {
+	if !validWord.MatchString(name) {
+		return nil, fmt.Errorf("invalid set name")
+	}
+	cmd := &SetCommand{
+		Command: "close",
+		SetName: name,
+	}
+	return cmd, nil
+}
+
+// NewClearCommand is used to drop a set
+func NewClearCommand(name string) (*SetCommand, error) {
+	if !validWord.MatchString(name) {
+		return nil, fmt.Errorf("invalid set name")
+	}
+	cmd := &SetCommand{
+		Command: "clear",
+		SetName: name,
+	}
+	return cmd, nil
+}
+
+func (c *SetCommand) Encode(w *bufio.Writer) error {
+	if _, err := w.WriteString(c.Command); err != nil {
+		return err
+	}
+	w.WriteByte(' ')
+	if _, err := w.WriteString(c.SetName); err != nil {
+		return err
+	}
+	return w.WriteByte('\n')
+}
+
+func (c *SetCommand) Decode(r *bufio.Reader) error {
+	resp, err := r.ReadString('\n')
+	if err != nil {
+		return err
+	}
+	c.result = resp
+	return nil
+}
+
+func (c *SetCommand) Result() (bool, error) {
+	switch c.result {
+	case "":
+		return false, fmt.Errorf("result not decoded yet")
+	case "Done\n":
+		return true, nil
+	case "Set does not exist\n":
+		if c.Command == "drop" {
+			return true, nil
+		} else {
+			return false, nil
+		}
+	case "Set is not proxied. Close it first.\n":
+		return false, nil
+	default:
+		return false, fmt.Errorf("invalid response: %s", c.result)
+	}
+}
+
 //set|s - Set an item in a set
 //bulk|b - Set many items in a set at once
 //info - Gets info about a set
 //flush - Flushes all sets or just a specified one<Paste>
-
-// ListSets is used to return a list of sets with their information
-func (c *Client) ListSets() ([]*ListEntry, error) {
-	return nil, nil
-}
-
-// DropSet is used to delete a set
-func (c *Client) DropSet(set string) error {
-	return nil
-}
-
-// CloseSet is used to unmap a set from memory but not delete
-func (c *Client) CloseSet(set string) error {
-	return nil
-}
-
-// ClearSet is used to remove the set from management but remains on disk
-func (c *Client) ClearSet(set string) error {
-	return nil
-}
 
 // SetItems is used to set a series of keys
 func (c *Client) SetItems(set string, keys []string) error {

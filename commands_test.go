@@ -123,6 +123,130 @@ END
 	}
 }
 
+func TestDropCommand(t *testing.T) {
+	// Invalid set
+	_, err := NewDropCommand("foo 123")
+	if err == nil {
+		t.Fatalf("expect error")
+	}
+
+	// Valid set
+	cmd, err := NewDropCommand("foo")
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+
+	// Verify the encode
+	expect := "drop foo\n"
+	verifyEncode(t, cmd, expect)
+
+	// Verify the decode
+	verifyDecode(t, cmd, "Done\n")
+	ok, err := cmd.Result()
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if !ok {
+		t.Fatalf("bad")
+	}
+
+	// Verify the decode
+	verifyDecode(t, cmd, "Set does not exist\n")
+	ok, err = cmd.Result()
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if !ok {
+		t.Fatalf("bad")
+	}
+}
+
+func TestCloseCommand(t *testing.T) {
+	// Invalid set
+	_, err := NewCloseCommand("foo 123")
+	if err == nil {
+		t.Fatalf("expect error")
+	}
+
+	// Valid set
+	cmd, err := NewCloseCommand("foo")
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+
+	// Verify the encode
+	expect := "close foo\n"
+	verifyEncode(t, cmd, expect)
+
+	// Verify the decode
+	verifyDecode(t, cmd, "Done\n")
+	ok, err := cmd.Result()
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if !ok {
+		t.Fatalf("bad")
+	}
+
+	// Verify the decode
+	verifyDecode(t, cmd, "Set does not exist\n")
+	ok, err = cmd.Result()
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if ok {
+		t.Fatalf("bad")
+	}
+}
+
+func TestClearCommand(t *testing.T) {
+	// Invalid set
+	_, err := NewClearCommand("foo 123")
+	if err == nil {
+		t.Fatalf("expect error")
+	}
+
+	// Valid set
+	cmd, err := NewClearCommand("foo")
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+
+	// Verify the encode
+	expect := "clear foo\n"
+	verifyEncode(t, cmd, expect)
+
+	// Verify the decode
+	verifyDecode(t, cmd, "Done\n")
+	ok, err := cmd.Result()
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if !ok {
+		t.Fatalf("bad")
+	}
+
+	// Verify the decode
+	verifyDecode(t, cmd, "Set does not exist\n")
+	ok, err = cmd.Result()
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if ok {
+		t.Fatalf("bad")
+	}
+
+	// Verify the decode
+	verifyDecode(t, cmd, "Set is not proxied. Close it first.\n")
+	ok, err = cmd.Result()
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if ok {
+		t.Fatalf("bad")
+	}
+}
+
 func verifyEncode(t *testing.T, cmd Command, expect string) {
 	var buf bytes.Buffer
 	bufW := bufio.NewWriter(&buf)
