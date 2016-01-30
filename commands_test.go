@@ -29,6 +29,28 @@ func TestValidWord(t *testing.T) {
 	}
 }
 
+func TestValidKey(t *testing.T) {
+	type tcase struct {
+		input string
+		valid bool
+	}
+	cases := []tcase{
+		{"foo", true},
+		{"foo123", true},
+		{"Foo123_123", true},
+		{"Foo123 123", false},
+		{"foo123-123", true},
+		{"foo123:123", true},
+		{"", false},
+		{"foo\nbar", false},
+	}
+	for _, tc := range cases {
+		if tc.valid != validKey.MatchString(tc.input) {
+			t.Fatalf("failed: %#v", tc)
+		}
+	}
+}
+
 func TestCreateCommand(t *testing.T) {
 	// Invalid set
 	_, err := NewCreateCommand("foo 123")
@@ -238,6 +260,50 @@ func TestClearCommand(t *testing.T) {
 
 	// Verify the decode
 	verifyDecode(t, cmd, "Set is not proxied. Close it first.\n")
+	ok, err = cmd.Result()
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if ok {
+		t.Fatalf("bad")
+	}
+}
+
+func TestSetKeysCommand(t *testing.T) {
+	// Invalid set
+	_, err := NewSetKeysCommand("foo 123", []string{"foo"})
+	if err == nil {
+		t.Fatalf("expect error")
+	}
+
+	// Invalid key
+	_, err = NewSetKeysCommand("foo", []string{"foo 123"})
+	if err == nil {
+		t.Fatalf("expect error")
+	}
+
+	// Valid set
+	cmd, err := NewSetKeysCommand("foo", []string{"bar", "baz"})
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+
+	// Verify the encode
+	expect := "b foo bar baz\n"
+	verifyEncode(t, cmd, expect)
+
+	// Verify the decode
+	verifyDecode(t, cmd, "Done\n")
+	ok, err := cmd.Result()
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if !ok {
+		t.Fatalf("bad")
+	}
+
+	// Verify the decode
+	verifyDecode(t, cmd, "Set does not exist\n")
 	ok, err = cmd.Result()
 	if err != nil {
 		t.Fatalf("err: %v", err)

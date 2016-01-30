@@ -9,6 +9,9 @@ import (
 var (
 	// validWord is used to sanity check inputs
 	validWord = regexp.MustCompile("^[a-zA-Z0-9_]+$")
+
+	// validKey is used to sanity check input keys
+	validKey = regexp.MustCompile("^[^ \n]+$")
 )
 
 // CreateCommand is used to make a new set
@@ -212,7 +215,7 @@ func NewDropCommand(name string) (*SetCommand, error) {
 	return cmd, nil
 }
 
-// NewCloseCommand is used to drop a set
+// NewCloseCommand is used to close a set out of memory
 func NewCloseCommand(name string) (*SetCommand, error) {
 	if !validWord.MatchString(name) {
 		return nil, fmt.Errorf("invalid set name")
@@ -224,7 +227,7 @@ func NewCloseCommand(name string) (*SetCommand, error) {
 	return cmd, nil
 }
 
-// NewClearCommand is used to drop a set
+// NewClearCommand is used to remove a set from management, but leave on disk
 func NewClearCommand(name string) (*SetCommand, error) {
 	if !validWord.MatchString(name) {
 		return nil, fmt.Errorf("invalid set name")
@@ -275,15 +278,78 @@ func (c *SetCommand) Result() (bool, error) {
 	}
 }
 
-//set|s - Set an item in a set
-//bulk|b - Set many items in a set at once
-//info - Gets info about a set
-//flush - Flushes all sets or just a specified one<Paste>
+// SetKeysCommand is used to set keys in a set
+type SetKeysCommand struct {
+	// SetName is the name of the set to create
+	SetName string
 
-// SetItems is used to set a series of keys
-func (c *Client) SetItems(set string, keys []string) error {
+	// Keys is the keys to set
+	Keys []string
+
+	// result is the result of the decode
+	result string
+}
+
+// NewSetKeysCommand is used to set keys in a set
+func NewSetKeysCommand(name string, keys []string) (*SetKeysCommand, error) {
+	if !validWord.MatchString(name) {
+		return nil, fmt.Errorf("invalid set name")
+	}
+	if len(keys) == 0 {
+		return nil, fmt.Errorf("missing keys to set")
+	}
+	for _, key := range keys {
+		if !validKey.MatchString(key) {
+			return nil, fmt.Errorf("invalid key: %s", key)
+		}
+	}
+	cmd := &SetKeysCommand{
+		SetName: name,
+		Keys:    keys,
+	}
+	return cmd, nil
+}
+
+func (c *SetKeysCommand) Encode(w *bufio.Writer) error {
+	if _, err := w.WriteString("b "); err != nil {
+		return err
+	}
+	if _, err := w.WriteString(c.SetName); err != nil {
+		return err
+	}
+	for _, key := range c.Keys {
+		w.WriteByte(' ')
+		if _, err := w.WriteString(key); err != nil {
+			return err
+		}
+	}
+	return w.WriteByte('\n')
+}
+
+func (c *SetKeysCommand) Decode(r *bufio.Reader) error {
+	resp, err := r.ReadString('\n')
+	if err != nil {
+		return err
+	}
+	c.result = resp
 	return nil
 }
+
+func (c *SetKeysCommand) Result() (bool, error) {
+	switch c.result {
+	case "":
+		return false, fmt.Errorf("result not decoded yet")
+	case "Done\n":
+		return true, nil
+	case "Set does not exist\n":
+		return false, nil
+	default:
+		return false, fmt.Errorf("invalid response: %s", c.result)
+	}
+}
+
+//info - Gets info about a set
+//flush - Flushes all sets or just a specified one<Paste>
 
 // SetInfo contains the results of a query
 type SetInfo struct {
