@@ -3,6 +3,7 @@ package hlld
 import (
 	"bufio"
 	"bytes"
+	"strings"
 	"testing"
 )
 
@@ -45,6 +46,42 @@ func TestCreateCommand(t *testing.T) {
 	cmd.ErrThreshold = 0.05
 	cmd.InMemory = true
 
+	// Verify the encode
+	expect := "create foo precision=12 eps=0.050000 in_memory=true\n"
+	verifyEncode(t, cmd, expect)
+
+	// Verify the decode
+	verifyDecode(t, cmd, "Done\n")
+	ok, err := cmd.Result()
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if !ok {
+		t.Fatalf("bad")
+	}
+
+	// Verify the decode
+	verifyDecode(t, cmd, "Exists\n")
+	ok, err = cmd.Result()
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if !ok {
+		t.Fatalf("bad")
+	}
+
+	// Verify the decode
+	verifyDecode(t, cmd, "Delete in progress\n")
+	ok, err = cmd.Result()
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if ok {
+		t.Fatalf("bad")
+	}
+}
+
+func verifyEncode(t *testing.T, cmd Command, expect string) {
 	var buf bytes.Buffer
 	bufW := bufio.NewWriter(&buf)
 	if err := cmd.Encode(bufW); err != nil {
@@ -54,8 +91,16 @@ func TestCreateCommand(t *testing.T) {
 
 	// Verify the encode
 	out := string(buf.Bytes())
-	expect := "create foo precision=12 eps=0.050000 in_memory=true\n"
 	if out != expect {
-		t.Fatalf("bad: %s", out)
+		t.Fatalf("bad: %s (expected: %s)", out, expect)
+	}
+}
+
+func verifyDecode(t *testing.T, cmd Command, input string) {
+	r := strings.NewReader(input)
+	bufR := bufio.NewReader(r)
+
+	if err := cmd.Decode(bufR); err != nil {
+		t.Fatalf("err: %v", err)
 	}
 }
