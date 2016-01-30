@@ -348,8 +348,63 @@ func (c *SetKeysCommand) Result() (bool, error) {
 	}
 }
 
+// FlushCommand is used to force a flush to disk
+type FlushCommand struct {
+	// SetName is the optional name of the set to create
+	SetName string
+
+	// result is the result of the decode
+	result string
+}
+
+// NewFlushCommand is used to flush keys to disk, optionally restricted
+// to a specific set
+func NewFlushCommand(name string) (*FlushCommand, error) {
+	if name != "" && !validWord.MatchString(name) {
+		return nil, fmt.Errorf("invalid set name")
+	}
+	cmd := &FlushCommand{
+		SetName: name,
+	}
+	return cmd, nil
+}
+
+func (c *FlushCommand) Encode(w *bufio.Writer) error {
+	if _, err := w.WriteString("flush"); err != nil {
+		return err
+	}
+	if c.SetName != "" {
+		w.WriteByte(' ')
+		if _, err := w.WriteString(c.SetName); err != nil {
+			return err
+		}
+	}
+	return w.WriteByte('\n')
+}
+
+func (c *FlushCommand) Decode(r *bufio.Reader) error {
+	resp, err := r.ReadString('\n')
+	if err != nil {
+		return err
+	}
+	c.result = resp
+	return nil
+}
+
+func (c *FlushCommand) Result() (bool, error) {
+	switch c.result {
+	case "":
+		return false, fmt.Errorf("result not decoded yet")
+	case "Done\n":
+		return true, nil
+	case "Set does not exist\n":
+		return false, nil
+	default:
+		return false, fmt.Errorf("invalid response: %s", c.result)
+	}
+}
+
 //info - Gets info about a set
-//flush - Flushes all sets or just a specified one<Paste>
 
 // SetInfo contains the results of a query
 type SetInfo struct {
@@ -381,14 +436,4 @@ type SetInfo struct {
 // QuerySet is used to return information about a set
 func (c *Client) QuerySet(set string) (*SetInfo, error) {
 	return nil, nil
-}
-
-// FlushSet flushes any outstanding data to disk for a set
-func (c *Client) FlushSet(set string) error {
-	return nil
-}
-
-// FlushAll flushes all the dirty sets to disk
-func (c *Client) FlushAll() error {
-	return nil
 }

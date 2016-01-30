@@ -313,6 +313,66 @@ func TestSetKeysCommand(t *testing.T) {
 	}
 }
 
+func TestFlushCommand_All(t *testing.T) {
+	// All sets
+	cmd, err := NewFlushCommand("")
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+
+	// Verify the encode
+	expect := "flush\n"
+	verifyEncode(t, cmd, expect)
+
+	// Verify the decode
+	verifyDecode(t, cmd, "Done\n")
+	ok, err := cmd.Result()
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if !ok {
+		t.Fatalf("bad")
+	}
+}
+
+func TestFlushCommand_Set(t *testing.T) {
+	// Invalid set
+	_, err := NewFlushCommand("foo 123")
+	if err == nil {
+		t.Fatalf("expect error")
+	}
+
+	// Valid set
+	cmd, err := NewFlushCommand("foo")
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+
+	// Verify the encode
+	expect := "flush foo\n"
+	verifyEncode(t, cmd, expect)
+
+	// Verify the decode
+	verifyDecode(t, cmd, "Done\n")
+	ok, err := cmd.Result()
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if !ok {
+		t.Fatalf("bad")
+	}
+
+	// Verify the decode
+	verifyDecode(t, cmd, "Set does not exist\n")
+	ok, err = cmd.Result()
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if ok {
+		t.Fatalf("bad")
+	}
+}
+
 func verifyEncode(t *testing.T, cmd Command, expect string) {
 	var buf bytes.Buffer
 	bufW := bufio.NewWriter(&buf)
