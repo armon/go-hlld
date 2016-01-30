@@ -373,6 +373,69 @@ func TestFlushCommand_Set(t *testing.T) {
 	}
 }
 
+func TestInfoCommand(t *testing.T) {
+	// Invalid prefix
+	_, err := NewInfoCommand("foo 123")
+	if err == nil {
+		t.Fatalf("expect error")
+	}
+
+	// Valid prefix
+	cmd, err := NewInfoCommand("foo")
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+
+	// Verify the encode
+	expect := "info foo\n"
+	verifyEncode(t, cmd, expect)
+
+	// Decode not exist
+	verifyDecode(t, cmd, "Set does not exist\n")
+	_, ok, err := cmd.Result()
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if ok {
+		t.Fatalf("bad")
+	}
+
+	// Verify the decode
+	inp := `START
+in_memory 1
+page_ins 1024
+page_outs 124
+eps 0.02
+precision 12
+sets 12450
+size 1540
+storage 3280
+END
+`
+	verifyDecode(t, cmd, inp)
+	info, ok, err := cmd.Result()
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if !ok {
+		t.Fatalf("bad")
+	}
+
+	expectInfo := &SetInfo{
+		InMemory:     true,
+		PageIns:      1024,
+		PageOuts:     124,
+		ErrThreshold: 0.02,
+		Precision:    12,
+		Sets:         12450,
+		Size:         1540,
+		Storage:      3280,
+	}
+	if !reflect.DeepEqual(info, expectInfo) {
+		t.Fatalf("bad: %#v %#v", info, expectInfo)
+	}
+}
+
 func verifyEncode(t *testing.T, cmd Command, expect string) {
 	var buf bytes.Buffer
 	bufW := bufio.NewWriter(&buf)

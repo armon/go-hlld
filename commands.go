@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"fmt"
 	"regexp"
+	"strconv"
+	"strings"
 )
 
 var (
@@ -404,7 +406,77 @@ func (c *FlushCommand) Result() (bool, error) {
 	}
 }
 
-//info - Gets info about a set
+// InfoCommand is used to make a new set
+type InfoCommand struct {
+	// SetName is the name of the set
+	SetName string
+
+	// lines is each line of output
+	lines []string
+
+	// Done indicates we've ended decode
+	done bool
+
+	// notExist indicates set does not exist
+	notExist bool
+}
+
+// NewInfoCommand is used to query a specific set
+func NewInfoCommand(name string) (*InfoCommand, error) {
+	if !validWord.MatchString(name) {
+		return nil, fmt.Errorf("invalid set name")
+	}
+	cmd := &InfoCommand{
+		SetName: name,
+	}
+	return cmd, nil
+}
+
+func (c *InfoCommand) Encode(w *bufio.Writer) error {
+	if _, err := w.WriteString("info "); err != nil {
+		return err
+	}
+	if _, err := w.WriteString(c.SetName); err != nil {
+		return err
+	}
+	return w.WriteByte('\n')
+}
+
+func (c *InfoCommand) Decode(r *bufio.Reader) error {
+	started := false
+	for {
+		resp, err := r.ReadString('\n')
+		if err != nil {
+			return err
+		}
+
+		// Handle the start condition
+		if !started {
+			switch resp {
+			case "Set does not exist\n":
+				c.done = true
+				c.notExist = true
+				return nil
+			case "START\n":
+				started = true
+				c.notExist = false
+				continue
+			default:
+				return fmt.Errorf("invalid response: %s", resp)
+			}
+		}
+
+		// Check for the end
+		if resp == "END\n" {
+			c.done = true
+			return nil
+		}
+
+		// Store the line
+		c.lines = append(c.lines, resp)
+	}
+	return nil
+}
 
 // SetInfo contains the results of a query
 type SetInfo struct {
@@ -421,7 +493,7 @@ type SetInfo struct {
 	ErrThreshold float64
 
 	// Precision is the number of precision bits used
-	Precision int
+	Precision uint64
 
 	// Sets is the number of write operations
 	Sets uint64
@@ -433,7 +505,74 @@ type SetInfo struct {
 	Storage uint64
 }
 
-// QuerySet is used to return information about a set
-func (c *Client) QuerySet(set string) (*SetInfo, error) {
-	return nil, nil
+func (c *InfoCommand) Result() (*SetInfo, bool, error) {
+	if !c.done {
+		return nil, false, fmt.Errorf("result not decoded yet")
+	}
+	if c.notExist {
+		return nil, false, nil
+	}
+
+	var err error
+	info := &SetInfo{}
+	for _, line := range c.lines {
+		//eps 0.02
+		switch {
+		case strings.HasPrefix(line, "in_memory"):
+			info.InMemory = line[10] == '1'
+
+		case strings.HasPrefix(line, "page_ins"):
+			num := line[9 : len(line)-1]
+			info.PageIns, err = strconv.ParseUint(num, 10, 64)
+			if err != nil {
+				return nil, false, fmt.Errorf("failed to parse '%s'", line)
+			}
+
+		case strings.HasPrefix(line, "page_outs"):
+			num := line[10 : len(line)-1]
+			info.PageOuts, err = strconv.ParseUint(num, 10, 64)
+			if err != nil {
+				return nil, false, fmt.Errorf("failed to parse '%s'", line)
+			}
+
+		case strings.HasPrefix(line, "eps"):
+			num := line[4 : len(line)-1]
+			info.ErrThreshold, err = strconv.ParseFloat(num, 64)
+			if err != nil {
+				return nil, false, fmt.Errorf("failed to parse '%s'", line)
+			}
+
+		case strings.HasPrefix(line, "precision"):
+			num := line[10 : len(line)-1]
+			info.Precision, err = strconv.ParseUint(num, 10, 64)
+			if err != nil {
+				return nil, false, fmt.Errorf("failed to parse '%s'", line)
+			}
+
+		case strings.HasPrefix(line, "sets"):
+			num := line[5 : len(line)-1]
+			info.Sets, err = strconv.ParseUint(num, 10, 64)
+			if err != nil {
+				return nil, false, fmt.Errorf("failed to parse '%s'", line)
+			}
+
+		case strings.HasPrefix(line, "size"):
+			num := line[5 : len(line)-1]
+			info.Size, err = strconv.ParseUint(num, 10, 64)
+			if err != nil {
+				return nil, false, fmt.Errorf("failed to parse '%s'", line)
+			}
+
+		case strings.HasPrefix(line, "storage"):
+			num := line[8 : len(line)-1]
+			info.Storage, err = strconv.ParseUint(num, 10, 64)
+			if err != nil {
+				return nil, false, fmt.Errorf("failed to parse '%s'", line)
+			}
+
+		default:
+			return nil, false, fmt.Errorf("failed to parse '%s'", line)
+		}
+	}
+	return info, true, nil
 }
