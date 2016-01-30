@@ -95,14 +95,71 @@ func (c *CreateCommand) Result() (bool, error) {
 	}
 }
 
-//list - List all sets or those matching a prefix
-//drop - Drop a set (Deletes from disk)
-//close - Closes a set (Unmaps from memory, but still accessible)
-//clear - Clears a set from the lists (Removes memory, left on disk)
-//set|s - Set an item in a set
-//bulk|b - Set many items in a set at once
-//info - Gets info about a set
-//flush - Flushes all sets or just a specified one<Paste>
+// ListCommand is used to make a new set
+type ListCommand struct {
+	// Prefix is the prefix to filter
+	Prefix string
+
+	// lines is each line of output
+	lines []string
+
+	// Done indicates we've ended decode
+	done bool
+}
+
+// NewListCommand is used to list the sets, filtering on
+// an optional prefix
+func NewListCommand(prefix string) (*ListCommand, error) {
+	if prefix != "" && !validWord.MatchString(prefix) {
+		return nil, fmt.Errorf("invalid prefix")
+	}
+	cmd := &ListCommand{
+		Prefix: prefix,
+	}
+	return cmd, nil
+}
+
+func (c *ListCommand) Encode(w *bufio.Writer) error {
+	if _, err := w.WriteString("list"); err != nil {
+		return err
+	}
+	if c.Prefix != "" {
+		w.WriteByte(' ')
+		if _, err := w.WriteString(c.Prefix); err != nil {
+			return err
+		}
+	}
+	return w.WriteByte('\n')
+}
+
+func (c *ListCommand) Decode(r *bufio.Reader) error {
+	started := false
+	for {
+		resp, err := r.ReadString('\n')
+		if err != nil {
+			return err
+		}
+
+		// Handle the start condition
+		if !started {
+			if resp != "START\n" {
+				return fmt.Errorf("expect list start block")
+			}
+			started = true
+			continue
+		}
+
+		// Check for the end
+		if resp == "END\n" {
+			c.done = true
+			return nil
+		}
+
+		// Store the line
+		c.lines = append(c.lines, resp)
+	}
+	return nil
+}
 
 // ListEntry is used to provide the details of a set when listing
 type ListEntry struct {
@@ -112,6 +169,32 @@ type ListEntry struct {
 	Size         uint64
 	Storage      uint64
 }
+
+func (c *ListCommand) Result() ([]*ListEntry, error) {
+	if !c.done {
+		return nil, fmt.Errorf("result not decoded yet")
+	}
+
+	out := make([]*ListEntry, len(c.lines))
+	for idx, line := range c.lines {
+		le := &ListEntry{}
+		_, err := fmt.Sscanf(line, "%s %f %d %d %d\n", &le.Name,
+			&le.ErrThreshold, &le.Precision, &le.Size, &le.Storage)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse '%s'", line)
+		}
+		out[idx] = le
+	}
+	return out, nil
+}
+
+//drop - Drop a set (Deletes from disk)
+//close - Closes a set (Unmaps from memory, but still accessible)
+//clear - Clears a set from the lists (Removes memory, left on disk)
+//set|s - Set an item in a set
+//bulk|b - Set many items in a set at once
+//info - Gets info about a set
+//flush - Flushes all sets or just a specified one<Paste>
 
 // ListSets is used to return a list of sets with their information
 func (c *Client) ListSets() ([]*ListEntry, error) {

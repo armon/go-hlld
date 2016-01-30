@@ -3,6 +3,7 @@ package hlld
 import (
 	"bufio"
 	"bytes"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -78,6 +79,47 @@ func TestCreateCommand(t *testing.T) {
 	}
 	if ok {
 		t.Fatalf("bad")
+	}
+}
+
+func TestListCommand(t *testing.T) {
+	// Invalid prefix
+	_, err := NewListCommand("foo 123")
+	if err == nil {
+		t.Fatalf("expect error")
+	}
+
+	// Valid prefix
+	cmd, err := NewListCommand("foo")
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+
+	// Verify the encode
+	expect := "list foo\n"
+	verifyEncode(t, cmd, expect)
+
+	// Verify the decode
+	inp := `START
+foo 0.010000 14 13108 0
+baz 0.005000 16 18000 50
+END
+`
+	verifyDecode(t, cmd, inp)
+	list, err := cmd.Result()
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if len(list) != 2 {
+		t.Fatalf("bad: %#v", list)
+	}
+
+	expectList := []*ListEntry{
+		{"foo", 0.01, 14, 13108, 0},
+		{"baz", 0.005, 16, 18000, 50},
+	}
+	if !reflect.DeepEqual(list, expectList) {
+		t.Fatalf("bad: %#v", list)
 	}
 }
 
