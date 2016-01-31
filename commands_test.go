@@ -18,7 +18,7 @@ func TestValidWord(t *testing.T) {
 		{"foo123", true},
 		{"Foo123_123", true},
 		{"Foo123 123", false},
-		{"foo123-123", false},
+		{"foo123-123", true},
 		{"foo123:123", false},
 		{"", false},
 	}
@@ -43,6 +43,8 @@ func TestValidKey(t *testing.T) {
 		{"foo123:123", true},
 		{"", false},
 		{"foo\nbar", false},
+		{"foo\tbar", false},
+		{"foo\rbar", false},
 	}
 	for _, tc := range cases {
 		if tc.valid != validKey.MatchString(tc.input) {

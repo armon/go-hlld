@@ -10,10 +10,10 @@ import (
 
 var (
 	// validWord is used to sanity check inputs
-	validWord = regexp.MustCompile("^[a-zA-Z0-9_]+$")
+	validWord = regexp.MustCompile("^[a-zA-Z0-9_-]+$")
 
 	// validKey is used to sanity check input keys
-	validKey = regexp.MustCompile("^[^ \n]+$")
+	validKey = regexp.MustCompile("^[^ \t\r\n]+$")
 )
 
 // CreateCommand is used to make a new set
