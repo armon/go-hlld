@@ -65,6 +65,15 @@ func DefaultConfig() *Config {
 	}
 }
 
+// Dial is a short hand to dial a new connection
+func Dial(addr string) (*Client, error) {
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	return NewClient(conn, nil)
+}
+
 // NewClient is used to create a new client by wrapping an existing connection
 func NewClient(conn net.Conn, config *Config) (*Client, error) {
 	// Default config if none given
@@ -90,7 +99,7 @@ func NewClient(conn net.Conn, config *Config) (*Client, error) {
 // Close is used to shut down the client
 func (c *Client) Close() error {
 	c.closedLock.Lock()
-	defer c.closedLock.Lock()
+	defer c.closedLock.Unlock()
 
 	if c.closed {
 		return nil
