@@ -24,7 +24,7 @@ if err != nil {
 }
 
 // Create a new set, custom precision
-createCommand, err := NewCreateCommand("foo")
+createCommand, err := hlld.NewCreateCommand("foo")
 if err != nil {
     panic("failed to make command")
 }
